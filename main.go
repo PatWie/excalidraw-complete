@@ -1,34 +1,26 @@
 package main
 
 import (
-	"bytes"
 	"embed"
 	_ "embed"
 	"excalidraw-complete/core"
-	"excalidraw-complete/documents/memory"
+	documents "excalidraw-complete/handlers/api"
+	"excalidraw-complete/stores"
 	"fmt"
-	"io"
 	"io/fs"
 	"net/http"
 	"os"
 	"os/signal"
-	"path"
-	"strings"
 	"syscall"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-	"github.com/go-chi/render"
 	"github.com/zishang520/engine.io/v2/types"
 	socketio "github.com/zishang520/socket.io/v2/socket"
 )
 
 type (
-	DocumentCreateResponse struct {
-		ID string `json:"id"`
-	}
-
 	UserToFollow struct {
 		SocketId string
 		Username string
@@ -42,33 +34,35 @@ type (
 //go:embed all:frontend
 var assets embed.FS
 
-func Assets() (fs.FS, error) {
-	return fs.Sub(assets, "frontend")
-}
-
-type FrontEndHandler struct{}
-
-func (h FrontEndHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	frontendHandler(w, r)
-}
-
-func frontendHandler(w http.ResponseWriter, r *http.Request) {
-	upath := r.URL.Path
-	if !strings.HasPrefix(upath, "/") {
-		upath = "/" + upath
-		r.URL.Path = upath
-	}
-	upath = path.Clean(upath)
-
+func handleUI() http.Handler {
 	sub, err := fs.Sub(assets, "frontend")
 	if err != nil {
 		panic(err)
 	}
-	http.FileServer(http.FS(sub)).ServeHTTP(w, r)
-
+	return http.FileServer(http.FS(sub))
 }
 
-func main() {
+func setupRouter(documentStore core.DocumentStore) *chi.Mux {
+	r := chi.NewRouter()
+	r.Use(middleware.Logger)
+
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   []string{"https://*", "http://*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "Content-Length", "X-CSRF-Token", "Token", "session", "Origin", "Host", "Connection", "Accept-Encoding", "Accept-Language", "X-Requested-With"},
+		AllowCredentials: true,
+		MaxAge:           300, // Maximum value not ignored by any of major browsers
+	}))
+
+	r.Route("/api/v2", func(r chi.Router) {
+		r.Post("/post/", documents.HandleCreate(documentStore))
+		r.Route("/{id}", func(r chi.Router) {
+			r.Get("/", documents.HandleGet(documentStore))
+		})
+	})
+	return r
+}
+func setupSocketIO() *socketio.Server {
 	opts := socketio.DefaultServerOptions()
 	opts.SetMaxHttpBufferSize(5000000)
 	opts.SetPath("/socket.io")
@@ -153,56 +147,11 @@ func main() {
 			socket.Disconnect(true)
 		})
 	})
+	return ioo
 
-	r := chi.NewRouter()
-	r.Use(middleware.Logger)
+}
 
-	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"https://*", "http://*"},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "Content-Length", "X-CSRF-Token", "Token", "session", "Origin", "Host", "Connection", "Accept-Encoding", "Accept-Language", "X-Requested-With"},
-		AllowCredentials: true,
-		MaxAge:           300, // Maximum value not ignored by any of major browsers
-	}))
-
-	documentStore := memory.NewDocumentStore()
-
-	r.Mount("/", FrontEndHandler{})
-
-	r.Route("/api/v2", func(r chi.Router) {
-		r.Post("/post/", func(w http.ResponseWriter, r *http.Request) {
-			data := new(bytes.Buffer)
-			_, err := io.Copy(data, r.Body)
-			if err != nil {
-				http.Error(w, "Failed to copy", http.StatusInternalServerError)
-				return
-			}
-			id, err := documentStore.Create(r.Context(), &core.Document{Data: *data})
-			if err != nil {
-				http.Error(w, "Failed to save", http.StatusInternalServerError)
-				return
-			}
-
-			render.JSON(w, r, DocumentCreateResponse{ID: id})
-			render.Status(r, http.StatusOK)
-		})
-		r.Route("/{id}", func(r chi.Router) {
-			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-				id := chi.URLParam(r, "id")
-				document, err := documentStore.FindID(r.Context(), id)
-				if err != nil {
-					http.Error(w, "not found", http.StatusNotFound)
-					return
-				}
-				w.Write(document.Data.Bytes())
-			})
-		})
-	})
-
-	r.Handle("/socket.io/", ioo.ServeHandler(nil))
-	go http.ListenAndServe(":3002", r)
-	fmt.Println("listen on 3002")
-
+func waitForShutdown(ioo *socketio.Server) {
 	exit := make(chan struct{})
 	SignalC := make(chan os.Signal)
 
@@ -220,4 +169,20 @@ func main() {
 	<-exit
 	ioo.Close(nil)
 	os.Exit(0)
+	fmt.Println("Shutting down...")
+	// TODO(patwie): Close other resources
+	os.Exit(0)
+}
+
+func main() {
+	documentStore := stores.GetStore() // Make sure this is well-defined in your "stores" package
+	r := setupRouter(documentStore)
+	ioo := setupSocketIO()
+	r.Handle("/socket.io/", ioo.ServeHandler(nil))
+	r.Mount("/", handleUI())
+
+	go http.ListenAndServe(":3002", r)
+	fmt.Println("listen on 3002")
+	waitForShutdown(ioo)
+
 }
