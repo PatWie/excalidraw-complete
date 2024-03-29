@@ -41,11 +41,17 @@ Interested in contributing or customizing? Build Excalidraw Complete from source
 
 ```bash
 # Clone and prepare the Excalidraw frontend
-git clone https://github.com/excalidraw/excalidraw.git
+git clone https://github.com/PatWie/excalidraw-complete.git --recursive
 cd excalidraw
-git checkout tags/v0.17.3
+# git checkout tags/v0.17.3
+# Fix docker build
+git remote add jcobol https://github.com/jcobol/excalidraw
+git fetch jcobol
+git checkout 7582_fix_docker_build
 git apply ../frontend.patch
-# Follow build instructions to compile assets into the frontend directory
+cd ../
+docker build -t exalidraw-ui-build excalidraw -f ui-build.Dockerfile
+docker run -v ${PWD}/:/pwd/ -it exalidraw-ui-build cp -r /frontend /pwd
 ```
 
 Compile the Go application:

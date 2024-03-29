@@ -22,12 +22,13 @@ import (
 
 type (
 	UserToFollow struct {
-		SocketId string
-		Username string
+		SocketId string `json:"socketId"`
+		Username string `json:"username"`
 	}
+
 	OnUserFollowedPayload struct {
-		UserToFollow UserToFollow
-		action       string
+		UserToFollow UserToFollow `json:"userToFollow"`
+		Action       string       `json:"action"` // "FOLLOW" | "UNFOLLOW"
 	}
 )
 
@@ -72,6 +73,7 @@ func setupSocketIO() *socketio.Server {
 		Credentials: true,
 	})
 	ioo := socketio.NewServer(nil, opts)
+
 	ioo.On("connection", func(clients ...any) {
 		socket := clients[0].(*socketio.Socket)
 		ioo.To(socketio.Room(socket.Id())).Emit("init-room")
