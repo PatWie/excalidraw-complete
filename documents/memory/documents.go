@@ -2,7 +2,7 @@ package memory
 
 import (
 	"context"
-	"excalidraw-backend/core"
+	"excalidraw-complete/core"
 	"fmt"
 
 	"github.com/oklog/ulid/v2"

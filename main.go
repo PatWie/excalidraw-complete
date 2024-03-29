@@ -2,20 +2,24 @@ package main
 
 import (
 	"bytes"
-	"excalidraw-backend/core"
-	"excalidraw-backend/documents/memory"
+	"embed"
+	_ "embed"
+	"excalidraw-complete/core"
+	"excalidraw-complete/documents/memory"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"os/signal"
+	"path"
+	"strings"
 	"syscall"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/go-chi/render"
-	"github.com/oklog/ulid/v2"
 	"github.com/zishang520/engine.io/v2/types"
 	socketio "github.com/zishang520/socket.io/v2/socket"
 )
@@ -35,6 +39,35 @@ type (
 	}
 )
 
+//go:embed all:frontend
+var assets embed.FS
+
+func Assets() (fs.FS, error) {
+	return fs.Sub(assets, "frontend")
+}
+
+type FrontEndHandler struct{}
+
+func (h FrontEndHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	frontendHandler(w, r)
+}
+
+func frontendHandler(w http.ResponseWriter, r *http.Request) {
+	upath := r.URL.Path
+	if !strings.HasPrefix(upath, "/") {
+		upath = "/" + upath
+		r.URL.Path = upath
+	}
+	upath = path.Clean(upath)
+
+	sub, err := fs.Sub(assets, "frontend")
+	if err != nil {
+		panic(err)
+	}
+	http.FileServer(http.FS(sub)).ServeHTTP(w, r)
+
+}
+
 func main() {
 	opts := socketio.DefaultServerOptions()
 	opts.SetMaxHttpBufferSize(5000000)
@@ -53,24 +86,23 @@ func main() {
 			room := socketio.Room(datas[0].(string))
 			fmt.Printf("Socket %v has joined %v\n", me, room)
 			socket.Join(room)
-			ioo.In(room).FetchSockets()(func(sockets []*socketio.RemoteSocket, _ error) {
-
-				if len(sockets) <= 1 {
-					ioo.To(socketio.Room(socket.Id())).Emit("first-in-room")
+			ioo.In(room).FetchSockets()(func(usersInRoom []*socketio.RemoteSocket, _ error) {
+				if len(usersInRoom) <= 1 {
+					ioo.To(socketio.Room(me)).Emit("first-in-room")
 				} else {
 					fmt.Printf("emit new user %v in room %v\n", me, room)
 					socket.Broadcast().To(room).Emit("new-user", me)
 				}
 
-				data := []socketio.SocketId{}
-				for _, osocket := range sockets {
-					data = append(data, osocket.Id())
+				// Inform all clients by new users.
+				newRoomUsers := []socketio.SocketId{}
+				for _, user := range usersInRoom {
+					newRoomUsers = append(newRoomUsers, user.Id())
 				}
-				fmt.Printf(" room %v has users %v\n", room, data)
-
+				fmt.Printf(" room %v has users %v\n", room, newRoomUsers)
 				ioo.In(room).Emit(
 					"room-user-change",
-					data,
+					newRoomUsers,
 				)
 
 			})
@@ -91,20 +123,22 @@ func main() {
 
 		})
 		socket.On("disconnecting", func(datas ...any) {
-			for _, oroom := range socket.Rooms().Keys() {
-				ioo.In(oroom).FetchSockets()(func(sockets []*socketio.RemoteSocket, _ error) {
-					otherClients := []socketio.SocketId{}
-					fmt.Printf("disconnecting %v from room %v", me, oroom)
-					for _, osocket := range sockets {
-						if osocket.Id() != me {
-							otherClients = append(otherClients, osocket.Id())
-							fmt.Println("other", osocket.Id())
+			for _, currentRoom := range socket.Rooms().Keys() {
+				ioo.In(currentRoom).FetchSockets()(func(usersInRoom []*socketio.RemoteSocket, _ error) {
+					allUsers := []socketio.SocketId{}
+					remainingUsers := []socketio.SocketId{}
+					fmt.Printf("disconnecting %v from room %v\n", me, currentRoom)
+					for _, userInRoom := range usersInRoom {
+						allUsers = append(allUsers, userInRoom.Id())
+						if userInRoom.Id() != me {
+							remainingUsers = append(remainingUsers, userInRoom.Id())
 						}
 					}
-					if len(otherClients) > 0 {
-						ioo.In(oroom).Emit(
+					if len(remainingUsers) > 0 {
+						fmt.Printf("leaving user, room %v has users %v -> %v\n", currentRoom, allUsers, remainingUsers)
+						ioo.In(currentRoom).Emit(
 							"room-user-change",
-							otherClients,
+							remainingUsers,
 						)
 
 					}
@@ -133,11 +167,7 @@ func main() {
 
 	documentStore := memory.NewDocumentStore()
 
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("you are all set"))
-		fmt.Println(ulid.Make())
-		render.Status(r, http.StatusOK)
-	})
+	r.Mount("/", FrontEndHandler{})
 
 	r.Route("/api/v2", func(r chi.Router) {
 		r.Post("/post/", func(w http.ResponseWriter, r *http.Request) {
@@ -171,6 +201,7 @@ func main() {
 
 	r.Handle("/socket.io/", ioo.ServeHandler(nil))
 	go http.ListenAndServe(":3002", r)
+	fmt.Println("listen on 3002")
 
 	exit := make(chan struct{})
 	SignalC := make(chan os.Signal)

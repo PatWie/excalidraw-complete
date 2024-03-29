@@ -46,6 +46,3 @@ changelog:
       - "^docs:"
       - "^test:"
 
-release:
-  disable: true
-  skip_upload: true

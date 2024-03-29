@@ -1,4 +1,4 @@
-module excalidraw-backend
+module excalidraw-complete
 
 go 1.21
 
