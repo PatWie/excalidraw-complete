@@ -44,7 +44,7 @@ func handleUI() http.Handler {
 	if err != nil {
 		panic(err)
 	}
-    // Let's hot-patch all calls to firebase DB
+	// Let's hot-patch all calls to firebase DB
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		originalPath := r.URL.Path
 		originalPath = strings.TrimPrefix(originalPath, "/")
@@ -132,7 +132,6 @@ func setupSocketIO() *socketio.Server {
 		Origin:      "*",
 		Credentials: true,
 	})
-	opts.SetTransports(types.NewSet("polling", "webtransport"))
 	ioo := socketio.NewServer(nil, opts)
 
 	ioo.On("connection", func(clients ...any) {
@@ -243,6 +242,12 @@ func main() {
 	r := setupRouter(documentStore)
 	ioo := setupSocketIO()
 	r.Handle("/socket.io/", ioo.ServeHandler(nil))
+	r.Get("/ping", func(w http.ResponseWriter, _ *http.Request) {
+		_, err := w.Write([]byte("pong"))
+		if err != nil {
+			panic(err)
+		}
+	})
 	r.Mount("/", handleUI())
 
 	go http.ListenAndServe(":3002", r)
