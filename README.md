@@ -42,23 +42,33 @@ Interested in contributing or customizing? Build Excalidraw Complete from source
 ```bash
 # Clone and prepare the Excalidraw frontend
 git clone https://github.com/PatWie/excalidraw-complete.git --recursive
-cd excalidraw
+cd ./excalidraw-complete/excalidraw
+
 # git checkout tags/v0.17.3
-# Fix docker build
-git remote add jcobol https://github.com/jcobol/excalidraw
-git fetch jcobol
-git checkout 7582_fix_docker_build
+# Fix docker build (fix already implemented upstream)
+# git remote add jcobol https://github.com/jcobol/excalidraw
+# git fetch jcobol
+# git checkout 7582_fix_docker_build
+
+# Adjust URLs inside of frontend.patch if you want to use a reverse proxy
 git apply ../frontend.patch
 cd ../
 docker build -t exalidraw-ui-build excalidraw -f ui-build.Dockerfile
 docker run -v ${PWD}/:/pwd/ -it exalidraw-ui-build cp -r /frontend /pwd
+git checkout firebase-patch
 ```
+
+(Optional) Replace `localhost:3002` inside of `main.go` with your domain name if you want to use a reverse proxy
+(Optional) Change ip:port of Go webserver at the end of `main.go` if you want to customize it
 
 Compile the Go application:
 
 ```bash
 go build -o excalidraw-complete main.go
 ```
+
+Declare environment variables if you want any (see section above)
+Example: `STORAGE_TYPE=sqlite DATA_SOURCE_NAME=/tmp/excalidb.sqlite`
 
 Start the server:
 
