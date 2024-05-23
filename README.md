@@ -58,7 +58,7 @@ docker run -v ${PWD}/:/pwd/ -it exalidraw-ui-build cp -r /frontend /pwd
 git checkout firebase-patch
 ```
 
-(Optional) Replace `localhost:3002` inside of `main.go` with your domain name if you want to use a reverse proxy
+(Optional) Replace `localhost:3002` inside of `main.go` with your domain name if you want to use a reverse proxy  
 (Optional) Change ip:port of Go webserver at the end of `main.go` if you want to customize it
 
 Compile the Go application:
