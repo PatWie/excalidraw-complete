@@ -53,12 +53,14 @@ cd ./excalidraw-complete/excalidraw
 # Adjust URLs inside of frontend.patch if you want to use a reverse proxy
 git apply ../frontend.patch
 cd ../
+git checkout dev
 docker build -t exalidraw-ui-build excalidraw -f ui-build.Dockerfile
 docker run -v ${PWD}/:/pwd/ -it exalidraw-ui-build cp -r /frontend /pwd
-git checkout firebase-patch
 ```
 
 (Optional) Replace `localhost:3002` inside of `main.go` with your domain name if you want to use a reverse proxy  
+(Optional) Replace `"ssl=!0", "ssl=0"` with `"ssl=!0", "ssl=1"` if you want to use HTTPS  
+(Optional) Replace `"ssl:!0", "ssl:0"` with `"ssl:!0", "ssl:1"` if you want to use HTTPS  
 (Optional) Change ip:port of Go webserver at the end of `main.go` if you want to customize it
 
 Compile the Go application:
