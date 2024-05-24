@@ -48,7 +48,12 @@ func handleUI() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		originalPath := r.URL.Path
 		originalPath = strings.TrimPrefix(originalPath, "/")
-		fmt.Println(originalPath)
+
+		// Redirect "/" to "index.html"
+		if originalPath == "" {
+			originalPath = "index.html"
+		}
+
 		file, err := sub.Open(originalPath)
 		if err != nil {
 			http.Error(w, "File not found", http.StatusNotFound)
@@ -64,9 +69,6 @@ func handleUI() http.Handler {
 		modifiedContent := strings.ReplaceAll(string(fileContent), "firestore.googleapis.com", "localhost:3002")
 		modifiedContent = strings.ReplaceAll(modifiedContent, "ssl=!0", "ssl=0")
 		modifiedContent = strings.ReplaceAll(modifiedContent, "ssl:!0", "ssl:0")
-		if modifiedContent != string(fileContent) {
-			fmt.Println("has replace")
-		}
 
 		// Set the correct Content-Type based on the file extension
 		contentType := http.DetectContentType([]byte(modifiedContent))
@@ -209,7 +211,6 @@ func setupSocketIO() *socketio.Server {
 			socket.Disconnect(true)
 		})
 	})
-	utils.Log().Println("%v", ioo)
 	return ioo
 
 }
