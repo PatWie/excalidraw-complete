@@ -75,7 +75,10 @@ Example: `STORAGE_TYPE=sqlite DATA_SOURCE_NAME=/tmp/excalidb.sqlite`
 Start the server:
 
 ```bash
-./excalidraw-complete
+go run main.go
+
+STORAGE_TYPE=sqlite DATA_SOURCE_NAME=test.db go run main.go --loglevel debug
+STORAGE_TYPE=filesystem LOCAL_STORAGE_PATH=/tmp/excalidraw/ go run main.go --loglevel debug
 ```
 
 Excalidraw Complete is now running on your machine, ready to bring your collaborative whiteboard ideas to life.

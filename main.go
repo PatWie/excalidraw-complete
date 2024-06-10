@@ -7,6 +7,7 @@ import (
 	"excalidraw-complete/handlers/api/documents"
 	"excalidraw-complete/handlers/api/firebase"
 	"excalidraw-complete/stores"
+	"flag"
 	"fmt"
 	"io"
 	"io/fs"
@@ -15,6 +16,8 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -239,6 +242,18 @@ func waitForShutdown(ioo *socketio.Server) {
 }
 
 func main() {
+	// Define a log level flag
+	logLevel := flag.String("loglevel", "info", "Set the logging level: debug, info, warn, error, fatal, panic")
+	flag.Parse()
+
+	// Set the log level
+	level, err := logrus.ParseLevel(*logLevel)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Invalid log level: %v\n", err)
+		os.Exit(1)
+	}
+	logrus.SetLevel(level)
+
 	documentStore := stores.GetStore() // Make sure this is well-defined in your "stores" package
 	r := setupRouter(documentStore)
 	ioo := setupSocketIO()
@@ -251,8 +266,15 @@ func main() {
 	})
 	r.Mount("/", handleUI())
 
-	go http.ListenAndServe(":3002", r)
-	fmt.Println("listen on 3002")
+	addr := ":3002"
+	logrus.WithField("addr", addr).Info("starting server")
+	go func() {
+		if err := http.ListenAndServe(addr, r); err != nil {
+			logrus.WithField("event", "start server").Fatal(err)
+		}
+	}()
+
+	logrus.Debug("Server is running in the background")
 	waitForShutdown(ioo)
 
 }
