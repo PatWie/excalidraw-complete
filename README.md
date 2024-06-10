@@ -58,10 +58,9 @@ docker build -t exalidraw-ui-build excalidraw -f ui-build.Dockerfile
 docker run -v ${PWD}/:/pwd/ -it exalidraw-ui-build cp -r /frontend /pwd
 ```
 
-(Optional) Replace `localhost:3002` inside of `main.go` with your domain name if you want to use a reverse proxy  
-(Optional) Replace `"ssl=!0", "ssl=0"` with `"ssl=!0", "ssl=1"` if you want to use HTTPS  
-(Optional) Replace `"ssl:!0", "ssl:0"` with `"ssl:!0", "ssl:1"` if you want to use HTTPS  
-(Optional) Change ip:port of Go webserver at the end of `main.go` if you want to customize it
+(Optional) Replace `localhost:3002` inside of `main.go` with your domain name if you want to use a reverse proxy
+(Optional) Replace `"ssl=!0", "ssl=0"` with `"ssl=!0", "ssl=1"` if you want to use HTTPS
+(Optional) Replace `"ssl:!0", "ssl:0"` with `"ssl:!0", "ssl:1"` if you want to use HTTPS
 
 Compile the Go application:
 
@@ -75,10 +74,10 @@ Example: `STORAGE_TYPE=sqlite DATA_SOURCE_NAME=/tmp/excalidb.sqlite`
 Start the server:
 
 ```bash
-go run main.go
+go run main.go --listen=":3002"
 
-STORAGE_TYPE=sqlite DATA_SOURCE_NAME=test.db go run main.go --loglevel debug
-STORAGE_TYPE=filesystem LOCAL_STORAGE_PATH=/tmp/excalidraw/ go run main.go --loglevel debug
+STORAGE_TYPE=sqlite DATA_SOURCE_NAME=test.db go run main.go --loglevel debug --listen=":3002"
+STORAGE_TYPE=filesystem LOCAL_STORAGE_PATH=/tmp/excalidraw/ go run main.go --loglevel debug --listen=":3002"
 ```
 
 Excalidraw Complete is now running on your machine, ready to bring your collaborative whiteboard ideas to life.

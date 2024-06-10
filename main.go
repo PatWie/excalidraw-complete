@@ -244,6 +244,7 @@ func waitForShutdown(ioo *socketio.Server) {
 func main() {
 	// Define a log level flag
 	logLevel := flag.String("loglevel", "info", "Set the logging level: debug, info, warn, error, fatal, panic")
+    listenAddr := flag.String("listen", ":3002", "Set the server listen address")
 	flag.Parse()
 
 	// Set the log level
@@ -266,10 +267,9 @@ func main() {
 	})
 	r.Mount("/", handleUI())
 
-	addr := ":3002"
-	logrus.WithField("addr", addr).Info("starting server")
+	logrus.WithField("addr", *listenAddr).Info("starting server")
 	go func() {
-		if err := http.ListenAndServe(addr, r); err != nil {
+		if err := http.ListenAndServe(*listenAddr, r); err != nil {
 			logrus.WithField("event", "start server").Fatal(err)
 		}
 	}()
